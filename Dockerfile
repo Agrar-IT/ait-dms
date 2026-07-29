@@ -4,7 +4,7 @@ FROM ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_VERSION}
 
 LABEL org.opencontainers.image.title="AIT DMS"
 LABEL org.opencontainers.image.description="Paperless-ngx with German E-Rechnung parser"
-LABEL org.opencontainers.image.source="https://github.com/GITHUB-OWNER/ait-dms"
+LABEL org.opencontainers.image.source="https://github.com/ThomasSchalt/ait-dms"
 
 USER root
 
