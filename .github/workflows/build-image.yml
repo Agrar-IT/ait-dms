@@ -1,1 +1,86 @@
+name: Build and publish AIT DMS image
 
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - .github/workflows/build-image.yml
+
+  workflow_dispatch:
+    inputs:
+      paperless_version:
+        description: "Paperless-ngx version"
+        required: true
+        default: "3.0.4"
+      erechnung_version:
+        description: "E-Rechnung plugin version"
+        required: true
+        default: "0.1.1"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v6
+
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v3
+
+      - name: Bei GHCR anmelden
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Versionen bestimmen
+        id: versions
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PAPERLESS_VERSION="${{ inputs.paperless_version }}"
+            ERECHNUNG_VERSION="${{ inputs.erechnung_version }}"
+          else
+            PAPERLESS_VERSION="3.0.2"
+            ERECHNUNG_VERSION="0.1.1"
+          fi
+
+          echo "paperless_version=${PAPERLESS_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "erechnung_version=${ERECHNUNG_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Image-Metadaten erzeugen
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=paperless-${{ steps.versions.outputs.paperless_version }}
+            type=sha,prefix=sha-
+
+      - name: Image bauen und veröffentlichen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            PAPERLESS_VERSION=${{ steps.versions.outputs.paperless_version }}
+            ERECHNUNG_VERSION=${{ steps.versions.outputs.erechnung_version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
