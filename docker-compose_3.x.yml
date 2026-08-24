@@ -1,0 +1,102 @@
+version: "3.6"
+services:
+  broker:
+    image: redis
+    container_name: Paperless-NGX-REDIS
+    restart: always
+    volumes:
+      - /volume1/docker/paperlessngx/redis:/data
+  db:
+    image: postgres:17.2-alpine
+    container_name: Paperless-NGX-DB
+    restart: always
+    volumes:
+      - /volume1/docker/paperlessngx/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:latest
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+  tika:
+    image: docker.io/apache/tika:latest
+    restart: unless-stopped
+  webserver:
+    image: paperless-ngx-erechnung:3.0.4
+    container_name: Paperless-NGX
+    restart: always
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    ports:
+      - 8777:8000
+    volumes:
+      - /volume1/docker/paperlessngx/data:/usr/src/paperless/data
+      - /volume1/docker/paperlessngx/media:/usr/src/paperless/media
+      - /volume1/docker/paperlessngx/export:/usr/src/paperless/export
+      - /volume1/DMS/DMS-Eingang:/usr/src/paperless/consume
+      - /volume1/docker/paperlessngx/logo:/logo:ro
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBHOST: postgres
+      USERMAP_UID: 1026
+      USERMAP_GID: 100
+      PAPERLESS_TIME_ZONE: Europe/Berlin
+      PAPERLESS_CONSUMER_RECURSIVE: true
+      PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: true
+      PAPERLESS_CONSUMER_DELETE_DUPLICATES: true
+      PAPERLESS_CONSUMER_IGNORE_PATTERNS: '["^\\._.*$", "^\\.localized$"]'
+      PAPERLESS_EMPTY_TRASH_DIR: ../media/trash
+      PAPERLESS_EMPTY_TRASH_DELAY: 3653
+      # Protokollierung
+      PAPERLESS_LOGROTATE_MAX_BACKUPS: 0
+      PAPERLESS_LOGROTATE_MAX_SIZE: 15728640
+      PAPERLESS_AUDIT_LOG_ENABLED: true
+      PAPERLESS_TASK_WORKERS: 4
+      PAPERLESS_WEBSERVER_WORKERS: 2
+      PAPERLESS_CONSUMER_IGNORE_DIRS: '[".stfolder", ".stversions", "@eaDir", "#recycle"]'
+      PAPERLESS_OCR_MODE: auto
+      PAPERLESS_ARCHIVE_FILE_GENERATION: auto
+      PAPERLESS_OCR_LANGUAGE: deu+eng
+      PAPERLESS_OCR_USER_ARGS: '{"invalidate_digital_signatures": true}, {"continue_on_soft_render_error": true}'
+      PAPERLESS_OCR_COLOR_CONVERSION_STRATEGY: LeaveColorUnchanged
+      PAPERLESS_OCR_OUTPUT_TYPE: pdfa-3
+      PAPERLESS_CONSUMER_ENABLE_BARCODES: true
+      # true wenn Stempel statt Trennblatt
+      PAPERLESS_CONSUMER_BARCODE_RETAIN_SPLIT_PAGES: true
+      PAPERLESS_APP_LOGO: /logo/AIT-LOGO.jpg
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      # Sitzung auslaufen lassen
+      PAPERLESS_ACCOUNT_SESSION_REMEMBER: false
+      PAPERLESS_SESSION_COOKIE_AGE: 604800 # 1 Woche
+      ### Kundenkonfiguration ab hier:
+      # python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+      PAPERLESS_SECRET_KEY: "HIER_LANGEN_ZUFAELLIGEN_SECRET_KEY_EINTRAGEN"
+      PAPERLESS_COOKIE_PREFIX: K1010DMS_
+      PAPERLESS_URL: https://k1010dms.agrar-it.digital
+      PAPERLESS_APP_TITLE: VORLAGE_DMS_STAND_2025-09-06
+      # Duplicate erlauben:
+      PAPERLESS_CONSUMER_DELETE_DUPLICATES: true
+      # MS365 Integration:
+      PAPERLESS_OAUTH_CALLBACK_BASE_URL: https://k1001dms.agrar-it.digital
+      PAPERLESS_OUTLOOK_OAUTH_CLIENT_ID: 87ebe5b2-XXXXXXXXXXXXXX-6eccbc7b8ae9
+      PAPERLESS_OUTLOOK_OAUTH_CLIENT_SECRET: 
+      # E-Mail-Versand
+      PAPERLESS_EMAIL_HOST: mail.agrar-it.cloud
+      PAPERLESS_EMAIL_PORT: 465
+      PAPERLESS_EMAIL_HOST_USER: @agrar-it.cloud
+      PAPERLESS_EMAIL_HOST_PASSWORD: 
+      PAPERLESS_EMAIL_USE_TLS: false
+      PAPERLESS_EMAIL_USE_SSL: true
+      
